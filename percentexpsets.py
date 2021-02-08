@@ -122,6 +122,7 @@ def comp(gene, row, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
     cluster_rest_statistics = {}
     for cluster, v in inv_map_rest.items():
         cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+    result = pd.DataFrame()
     for cnamei, sti in cluster_statistics.items():
         for cnamej, stj in cluster_statistics.items():
             if cnamei != cnamej:
