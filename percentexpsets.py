@@ -77,6 +77,31 @@ def gen_expression_count(X1, X2, min_zscore=min_zscore):
     return (((np.asarray(X1["data"]) - X2["mean"]) / (X2["std"] + 1e-16)) > min_zscore).sum() / X1["n"][0]
 
 
+# Just compute X1s expression level given X2
+def compute_percent_expression(X1, X2, min_zscore=min_zscore):
+    if len(X2["low_means"]) > 1:
+        inv_map = trygmonvector(X2["gm"], X1["data"])
+        if X2["label_order"][1] in inv_map:
+            expressed_num = len(inv_map[X2["label_order"][1]])
+        else:
+            expressed_num = 0
+        if X2["label_order"][0] in inv_map:
+            unexpressed_num = len(inv_map[X2["label_order"][0]])
+        else:
+            unexpressed_num = 0
+        result_percent_expressed = expressed_num/(expressed_num+unexpressed_num)
+    elif len(X1["low_means"]) > 1:
+        result_percent_expressed = X1["n"][1]/(X1["n"][0]+X1["n"][1])
+    else:
+        if X1["low_means"][0] > X2["high_means"][0]:
+            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+        elif X1["high_means"][0] < X2["low_means"][0]:
+            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+        else:
+            result_percent_expressed = 0.0
+    return result_percent_expressed*100.0
+
+
 # Note that X2 provies the statistic for saying "on" or "off" if it has two states
 def compute_percent_diff(X1, X2, min_zscore=min_zscore):
     if(len(X2["low_means"]) > 1):
@@ -119,6 +144,24 @@ def compute_percent_diff(X1, X2, min_zscore=min_zscore):
 
     percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
     return percent_diff
+
+
+def compref(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
+    base_statistic = one_or_two_mixtures(row, alpha=alpha, min_dist=min_dist)
+    cluster_statistics = {}
+    for cluster, v in inv_map.items():
+        cluster_statistics[cluster] = compute_percent_expression(one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist), base_statistic)
+    cluster_rest_statistics = {}
+    for cluster, v in inv_map_rest.items():
+        cluster_rest_statistics[cluster] = compute_percent_expression(one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist), base_statistic)
+    result = pd.DataFrame(index=[gene], columns=colnames)
+    for cnamei, sti in cluster_statistics.items():
+        for cnamej, stj in cluster_statistics.items():
+            if cnamei != cnamej:
+                result["{} vs {}".format(cnamei, cnamej)][gene] = sti-stj
+    for cnamei, sti in cluster_rest_statistics.items():
+        stself = cluster_statistics[cnamei]
+        result["{} vs rest".format(cnamei)][gene] = stself - sti
 
 
 def comp(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
@@ -190,8 +233,8 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(comp)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
-    result = pd.concat(result, axis=0)
+    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(compref)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    result = pd.concat(results, axis=0)
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
     gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
