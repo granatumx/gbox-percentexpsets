@@ -164,11 +164,11 @@ def main():
         cluster_rest_statistics = {}
         for cluster, v in inv_map_rest.items():
             cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
-        for cnamei, sti in cluster_statistics:
-            for cnamej, stj in cluster_statistics:
+        for cnamei, sti in cluster_statistics.items():
+            for cnamej, stj in cluster_statistics.items():
                 if cnamei != cnamej:
                     result["{} vs {}".format(cnamei, cnamej)][gene] = compute_percent_diff(sti, stj, min_zscore=min_zscore)
-        for cnamei, sti in cluster_rest_statistics:
+        for cnamei, sti in cluster_rest_statistics.items():
             stself = cluster_statistics[cnamei]
             result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
 
