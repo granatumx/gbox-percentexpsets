@@ -10,6 +10,7 @@ from granatum_sdk import Granatum
 from scipy.optimize import curve_fit
 from sklearn.mixture import GaussianMixture as GM
 import statistics as s
+from joblib import Parallel, delayed
 
 min_dist = 2.0
 min_zscore = 2.0
@@ -112,6 +113,22 @@ def compute_percent_diff(X1, X2, min_zscore=min_zscore):
     percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
     return percent_diff
 
+def comp(gene, assay):
+    row = assay.loc[gene, :]
+    cluster_statistics = {}
+    for cluster, v in inv_map.items():
+        cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+    cluster_rest_statistics = {}
+    for cluster, v in inv_map_rest.items():
+        cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+    for cnamei, sti in cluster_statistics.items():
+        for cnamej, stj in cluster_statistics.items():
+            if cnamei != cnamej:
+                result["{} vs {}".format(cnamei, cnamej)][gene] = compute_percent_diff(sti, stj, min_zscore=min_zscore)
+    for cnamei, sti in cluster_rest_statistics.items():
+        stself = cluster_statistics[cnamei]
+        result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
+
 def main():
     tic = time.perf_counter()
 
@@ -126,6 +143,10 @@ def main():
     
     min_zscore = gn.get_arg('min_zscore')
     min_dist = gn.get_arg('min_dist')
+
+    # Likely we want to filter genes before we get started, namely if we cannot create a good statistic
+    norms_df = assay.apply(np.linalg.norm, axis=1)
+    assay = assay.loc[norms_df.T >= min_dist, :]
 
     inv_map = {}
     inv_map_rest = {}
@@ -158,22 +179,9 @@ def main():
     # For example gene "XIST" expresses at least 20% more in cluster 1 vs cluster 4 with 95% certainty
     gene_count = 0;
     total_genes = len(assay.index)
-    for gene, row in assay.iterrows():
-        print("{} / {}".format(gene_count, total_genes), flush=True)
-        gene_count = gene_count+1
-        cluster_statistics = {}
-        for cluster, v in inv_map.items():
-            cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
-        cluster_rest_statistics = {}
-        for cluster, v in inv_map_rest.items():
-            cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
-        for cnamei, sti in cluster_statistics.items():
-            for cnamej, stj in cluster_statistics.items():
-                if cnamei != cnamej:
-                    result["{} vs {}".format(cnamei, cnamej)][gene] = compute_percent_diff(sti, stj, min_zscore=min_zscore)
-        for cnamei, sti in cluster_rest_statistics.items():
-            stself = cluster_statistics[cnamei]
-            result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
+    print("Executing parallel for {} genes".format(total_genes), flush=True)
+
+    Parallel(n_jobs=10, require='sharedmem')(delayed(comp)(gene, assay) for gene in list(assay.index))
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
     gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
