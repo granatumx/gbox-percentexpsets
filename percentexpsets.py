@@ -159,10 +159,11 @@ def main():
     for gene, row in assay.iterrows():
         cluster_statistics = {}
         for cluster, v in inv_map.items():
-            cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+            print("Gene {} Cluster {} Result {}".format(gene, cluster, v), flush=True)
+            cluster_statistics[cluster] = one_or_two_mixtures(assay.loc(gene, v).tolist(), alpha=alpha, min_dist=min_dist)
         cluster_rest_statistics = {}
         for cluster, v in inv_map_rest.items():
-            cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+            cluster_rest_statistics[cluster] = one_or_two_mixtures(assay.loc(gene, v).tolist(), alpha=alpha, min_dist=min_dist)
         for cnamei, sti in cluster_statistics:
             for cnamej, stj in cluster_statistics:
                 if cnamei != cnamej:
