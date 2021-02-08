@@ -9,12 +9,106 @@ import statsmodels.stats.api as sms
 from granatum_sdk import Granatum
 from scipy.optimize import curve_fit
 
-def range_check(x, y):
-    if(x <= 0.0 and y <= 0.0):
-        return max(x, y)
-    if (x >= 0.0 and y >= 0.0):
-        return min(x, y)
+min_dist = 2.0
+min_zscore = 2.0
+
+def confint(X, alpha=0.05):
+    resultdict = {}
+    meanbounds = sms.DescrStatsW(X).tconfint_mean(alpha=alpha)
+    resultdict["low"] = meanbounds[0]
+    resultdict["high"] = meanbounds[1]
+    resultdict["n"] = len(X)
+    return resultdict
+
+def dist(int1, int2):
+    if int1["low"] >= int2["high"]:
+        return int1["low"] - int2["high"]
+    if int2["low"] >= int1["high"]:
+        return int2["low"] - int1["high"]
     return 0.0
+
+# return hash of labels associated to its data
+def trygmonvector(gm, X):
+    vectors = gm.predict(np.array(X).reshape(-1, 1))
+    inv_map = {}
+    for i, v in enumerate(vectors):
+        inv_map[v] = inv_map.get(v, []) + [X[i]]
+    return inv_map
+
+# First try two mixtures
+# Return: {"data": X, "gm": GM, low_means: [], high_means: [], n: []}
+def one_or_two_mixtures(X, alpha=0.05, min_dist=min_dist):
+    column = np.array(X).reshape(-1, 1)
+    gm = GM(n_components=2).fit(column)
+    inv_map = trygmonvector(gm, X)
+    mean = s.mean(X)
+    std = s.stdev(X)
+
+    if len(inv_map) <= 1 or len(inv_map[0]) < 3 or len(inv_map[1]) < 3:
+        gm = GM(n_components=1).fit(column)
+        mi = confint(X)
+        return {"data": X, "mean": mean, "std": std, "gm": gm, "low_means": [mi["low"]], "high_means": [mi["high"]], "n": [len(X)]}
+
+    mi1 = confint(inv_map[0], alpha=alpha)
+    mi2 = confint(inv_map[1], alpha=alpha)
+    # zscore1 = abs(s.mean(inv_map[0])-s.mean(inv_map[1]))/(s.stdev(inv_map[1])+1e-16)
+    # zscore2 = abs(s.mean(inv_map[1])-s.mean(inv_map[0]))/(s.stdev(inv_map[0])+1e-16)
+    if dist(mi1, mi2) <= min_dist:
+        gm = GM(n_components=1).fit(column)
+        mi = confint(X)
+        result = {"data": X, "mean": mean, "std": std, "gm": gm, "low_means": [mi["low"]], "high_means": [mi["high"]], "n": [len(X)]}
+    elif mi1["low"] < mi2["low"]:
+        result = {"data": X, "mean": mean, "std": std, "gm": gm, "label_order": [0, 1], "low_means": [mi1["low"], mi2["low"]], "high_means": [mi1["high"], mi2["high"]], "n": [mi1["n"], mi2["n"]]}
+    else:
+        result = {"data": X, "mean": mean, "std": std, "gm": gm, "label_order": [1, 0], "low_means": [mi2["low"], mi1["low"]], "high_means": [mi2["high"], mi1["high"]], "n": [mi2["n"], mi1["n"]]}
+    return result
+
+def gen_expression_count(X1, X2, min_zscore=min_zscore):
+    # print(((np.asarray(X1["data"]) - X2["mean"]) / (X2["std"] + 1e-16)))
+    return (((np.asarray(X1["data"]) - X2["mean"]) / (X2["std"] + 1e-16)) > min_zscore).sum() / X1["n"][0]
+
+# Note that X2 provies the statistic for saying "on" or "off" if it has two states
+def compute_percent_diff(X1, X2, min_zscore=min_zscore):
+    if(len(X2["low_means"]) > 1):
+        source_percent_expressed = X2["n"][1]/(X2["n"][0]+X2["n"][1])
+        inv_map = trygmonvector(X2["gm"], X1["data"])
+        if X2["label_order"][1] in inv_map:
+            expressed_num = len(inv_map[X2["label_order"][1]])
+        else:
+            expressed_num = 0
+        if X2["label_order"][0] in inv_map:
+            unexpressed_num = len(inv_map[X2["label_order"][0]])
+        else:
+            unexpressed_num = 0
+        result_percent_expressed = expressed_num/(expressed_num+unexpressed_num)
+    elif(len(X1["low_means"]) > 1):
+        result_percent_expressed = X1["n"][1]/(X1["n"][0]+X1["n"][1])
+        inv_map = trygmonvector(X1["gm"], X2["data"])
+        if X1["label_order"][1] in inv_map:
+            expressed_matching = len(inv_map[X1["label_order"][1]])
+        else:
+            expressed_matching = 0.0
+        if X1["label_order"][0] in inv_map:
+            unexpressed_matching = len(inv_map[X1["label_order"][0]])
+        else:
+            unexpressed_matching = 0.0
+        if unexpressed_matching > expressed_matching:
+            source_percent_expressed = 0.0
+        else:
+            source_percent_expressed = 1.0
+    else:
+        if X1["low_means"][0] > X2["high_means"][0]:
+            source_percent_expressed = gen_expression_count(X2, X1, min_zscore=min_zscore)
+            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+        elif X1["high_means"][0] < X2["low_means"][0]:
+            source_percent_expressed = gen_expression_count(X2, X1, min_zscore=min_zscore)
+            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+        else:
+            result_percent_expressed = 0.0
+            source_percent_expressed = 0.0
+
+    percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
+    return percent_diff
 
 def main():
     tic = time.perf_counter()
@@ -22,97 +116,60 @@ def main():
     gn = Granatum()
 
     assay = gn.pandas_from_assay(gn.get_import('assay'))
+    # Groups is {"cell":"cluster}
     groups = gn.get_import('groups')
 
     certainty = gn.get_arg('certainty')
+    alpha = 1 - certainty/100.0
+    
+    min_zscore = gn.get_arg('min_zscore')
+    min_dist = gn.get_arg('min_dist')
 
     inv_map = {}
+    inv_map_rest = {}
     for k, v in groups.items():
         inv_map[v] = inv_map.get(v, []) + [k]
+        clist = inv_map.get(v, assay.columns)
+        clist.remove(clist)
+        inv_map_rest[v] = clist
+    # Inv map is {"cluster": ["cell"]}
+    
+    cols = list(inv_map.keys())
+    genes = assay.index.tolist()
+    
+    colnames = []
+    for coli in cols:
+        for colj in cols:
+            if coli != colj:
+                colnames.append("{} vs {}".format(coli, colj))
+    for coli in cols:
+        colnames.append("{} vs rest".format(coli))
+
+    result = pd.DataFrame(index=genes, columns=colnames)
+    result.fillna(0)
 
     # Instead of scoring into a dataframe, let's analyze each statistically
     # Dict (gene) of dict (cluster) of dict (statistics)
     # { "gene_name" : { "cluster_name" : { statistics data } }}
     # Export would be percentage more/less expressed in "on" state
     # For example gene "XIST" expresses at least 20% more in cluster 1 vs cluster 4 with 95% certainty
-    low_mean_dfs = []
-    high_mean_dfs = []
-    mean_dfs = []
-    std_dfs = []
-    colnames = []
-    for k, v in inv_map.items():
-        group_values = assay.loc[:, v] # All genes for group of cells
-        lowbound_clust = {}
-        highbound_clust = {}
-        for index, row in group_values.iterrows():
-            meanbounds = sms.DescrStatsW(row).tconfint_mean()
-            lowbound_clust[index] = meanbounds[0]
-            highbound_clust[index] = meanbounds[1]
-        low_mean_dfs.append(pd.DataFrame.from_dict(lowbound_clust, orient="index", columns=[k]))
-        high_mean_dfs.append(pd.DataFrame.from_dict(highbound_clust, orient="index", columns=[k]))
-        mean_dfs.append(group_values.mean(axis=1))
-        std_dfs.append(group_values.std(axis=1))
-        colnames.append(k)
-    mean_df = pd.concat(mean_dfs, axis=1)
-    mean_df.columns = colnames
-    low_mean_df = pd.concat(low_mean_dfs, axis=1)
-    low_mean_df.columns = colnames
-    high_mean_df = pd.concat(high_mean_dfs, axis=1)
-    high_mean_df.columns = colnames
-    std_df = pd.concat(std_dfs, axis=1)
-    std_df.columns = colnames
-    print(std_df)
-    minvalues = std_df.min(axis=1).to_frame()
-    minvalues.columns=["min"]
-    print("Minvalues>>")
-    print(minvalues, flush=True)
-    genes_below_min = list((minvalues[minvalues["min"]<min_expression_variation]).index)
-    print("{} out of {}".format(len(genes_below_min), len(minvalues.index)), flush=True)
-    mean_df = mean_df.drop(genes_below_min, axis=0)
-    low_mean_df = low_mean_df.drop(genes_below_min, axis=0)
-    high_mean_df = high_mean_df.drop(genes_below_min, axis=0)
-    std_df = std_df.drop(genes_below_min, axis=0)
-    assay = assay.drop(genes_below_min, axis=0)
-    print("Filtered assay to get {} columns by {} rows".format(len(assay.columns), len(assay.index)), flush=True)
+    for gene, row in assay.iterrows():
+        cluster_statistics = {}
+        for cluster, v in inv_map.items():
+            cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+        cluster_rest_statistics = {}
+        for cluster, v in inv_map_rest.items():
+            cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
+        for cnamei, sti in cluster_statistics:
+            for cnamej, stj in cluster_statistics:
+                if cnamei != cnamej:
+                    result["{} vs {}".format(cnamei, cnamej)][gene] = compute_percent_diff(sti, stj, min_zscore=min_zscore)
+        for cnamei, sti in cluster_rest_statistics:
+            stself = cluster_statistics[cnamei]
+            result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
 
-    mean_rest_dfs = []
-    std_rest_dfs = []
-    colnames = []
-    for k, v in inv_map.items():
-        rest_v = list(set(list(assay.columns)).difference(set(v)))
-        mean_rest_dfs.append(assay.loc[:, rest_v].mean(axis=1))
-        std_rest_dfs.append(assay.loc[:, rest_v].std(axis=1))
-        colnames.append(k)
-    mean_rest_df = pd.concat(mean_rest_dfs, axis=1)
-    mean_rest_df.columns = colnames
-    std_rest_df = pd.concat(std_rest_dfs, axis=1)
-    std_rest_df.columns = colnames
-
-    zscore_dfs = []
-    cols = colnames
-    colnames = []
-    for coli in cols:
-        for colj in cols:
-            if coli != colj:
-                # Here we should check significance
-                # Fetch most realistic mean comparison set, what is smallest difference between two ranges
-                mean_diff_overlap_low_high = (low_mean_df[coli]-high_mean_df[colj])
-                mean_diff_overlap_high_low = (high_mean_df[coli]-low_mean_df[colj])
-                diff_df = mean_diff_overlap_low_high.combine(mean_diff_overlap_high_low, range_check)
-
-                zscore_dfs.append((diff_df/(std_df[colj]+std_df[coli]/4)).fillna(0).clip(-max_zscore, max_zscore))
-                colnames.append("{} vs {}".format(coli, colj)) 
-    for coli in cols:
-        zscore_dfs.append(((mean_df[coli]-mean_rest_df[colj])/(std_rest_df[colj]+std_rest_df[coli]/4)).fillna(0).clip(-max_zscore, max_zscore))
-        colnames.append("{} vs rest".format(coli)) 
-
-    zscore_df = pd.concat(zscore_dfs, axis=1)
-    zscore_df.columns = colnames
-    norms_df = zscore_df.apply(np.linalg.norm, axis=1)
-    colsmatching = norms_df.T[(norms_df.T >= min_zscore)].index.values
-    return_df = zscore_df.T[colsmatching]
-    gn.export_statically(gn.assay_from_pandas(return_df), 'Differential expression sets')
-    gn.export(return_df.T.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
+    gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
+    gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
 
     toc = time.perf_counter()
     time_passed = round(toc - tic, 2)

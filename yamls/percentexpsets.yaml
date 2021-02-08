@@ -24,11 +24,23 @@ frontend:
   args:
     - min: 0.0
       max: 100.0
-      step: 0.01
+      step: 0.1
       type: number
       label: Certainty (I am x% certain that at least 30% are differentially expressing gene y in group 1 vs group 2)
       default: 95.0
       injectInto: certainty
+    - min: 0.0
+      step: 0.1
+      type: number
+      label: Expression levels that are considered distinct between the mean of two groups
+      default: 2.0
+      injectInto: min_dist
+    - min: 0.0
+      step: 0.1
+      type: number
+      label: Z-score level above which is considered significant for up-regulation to occur if only one Gaussian present
+      default: 2.0
+      injectInto: min_zscore
   imports:
     - kind: assay
       label: Assay including matrix and geneIds
