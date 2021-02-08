@@ -11,6 +11,7 @@ from scipy.optimize import curve_fit
 from sklearn.mixture import GaussianMixture as GM
 import statistics as s
 from joblib import Parallel, delayed
+import multiprocessing
 
 min_dist = 2.0
 min_zscore = 2.0
@@ -181,7 +182,7 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    Parallel(n_jobs=10, require='sharedmem')(delayed(comp)(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in list(assay.index))
+    Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6), require='sharedmem')(delayed(comp)(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in list(assay.index))
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
     gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
