@@ -162,6 +162,7 @@ def compref(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zsc
     for cnamei, sti in cluster_rest_statistics.items():
         stself = cluster_statistics[cnamei]
         result["{} vs rest".format(cnamei)][gene] = stself - sti
+    return result
 
 
 def comp(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
@@ -179,6 +180,7 @@ def comp(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore
     for cnamei, sti in cluster_rest_statistics.items():
         stself = cluster_statistics[cnamei]
         result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
+    return result
 
 
 def main():
@@ -233,7 +235,7 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(compref)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*9/10))(delayed(compref)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
     result = pd.concat(results, axis=0)
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
