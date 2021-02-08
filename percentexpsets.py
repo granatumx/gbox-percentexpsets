@@ -8,6 +8,8 @@ import math
 import statsmodels.stats.api as sms
 from granatum_sdk import Granatum
 from scipy.optimize import curve_fit
+from sklearn.mixture import GaussianMixture as GM
+import statistics as s
 
 min_dist = 2.0
 min_zscore = 2.0
