@@ -25,12 +25,14 @@ def confint(X, alpha=0.05):
     resultdict["n"] = len(X)
     return resultdict
 
+
 def dist(int1, int2):
     if int1["low"] >= int2["high"]:
         return int1["low"] - int2["high"]
     if int2["low"] >= int1["high"]:
         return int2["low"] - int1["high"]
     return 0.0
+
 
 # return hash of labels associated to its data
 def trygmonvector(gm, X):
@@ -39,6 +41,7 @@ def trygmonvector(gm, X):
     for i, v in enumerate(vectors):
         inv_map[v] = inv_map.get(v, []) + [X[i]]
     return inv_map
+
 
 # First try two mixtures
 # Return: {"data": X, "gm": GM, low_means: [], high_means: [], n: []}
@@ -68,9 +71,11 @@ def one_or_two_mixtures(X, alpha=0.05, min_dist=min_dist):
         result = {"data": X, "mean": mean, "std": std, "gm": gm, "label_order": [1, 0], "low_means": [mi2["low"], mi1["low"]], "high_means": [mi2["high"], mi1["high"]], "n": [mi2["n"], mi1["n"]]}
     return result
 
+
 def gen_expression_count(X1, X2, min_zscore=min_zscore):
     # print(((np.asarray(X1["data"]) - X2["mean"]) / (X2["std"] + 1e-16)))
     return (((np.asarray(X1["data"]) - X2["mean"]) / (X2["std"] + 1e-16)) > min_zscore).sum() / X1["n"][0]
+
 
 # Note that X2 provies the statistic for saying "on" or "off" if it has two states
 def compute_percent_diff(X1, X2, min_zscore=min_zscore):
@@ -115,14 +120,15 @@ def compute_percent_diff(X1, X2, min_zscore=min_zscore):
     percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
     return percent_diff
 
-def comp(gene, row, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
+
+def comp(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
     cluster_statistics = {}
     for cluster, v in inv_map.items():
         cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
     cluster_rest_statistics = {}
     for cluster, v in inv_map_rest.items():
         cluster_rest_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
-    result = pd.DataFrame()
+    result = pd.DataFrame(index=[gene], columns=colnames)
     for cnamei, sti in cluster_statistics.items():
         for cnamej, stj in cluster_statistics.items():
             if cnamei != cnamej:
@@ -130,6 +136,7 @@ def comp(gene, row, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
     for cnamei, sti in cluster_rest_statistics.items():
         stself = cluster_statistics[cnamei]
         result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
+
 
 def main():
     tic = time.perf_counter()
@@ -183,7 +190,7 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(comp)(gene, assay.loc[gene, :], inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(comp)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
     result = pd.concat(result, axis=0)
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
