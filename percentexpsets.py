@@ -131,7 +131,7 @@ def main():
     inv_map_rest = {}
     for k, v in groups.items():
         inv_map[v] = inv_map.get(v, []) + [k]
-        clist = inv_map_rest.get(v, assay.columns)
+        clist = inv_map_rest.get(v, list(assay.columns))
         clist.remove(k)
         inv_map_rest[v] = clist
     # Inv map is {"cluster": ["cell"]}
