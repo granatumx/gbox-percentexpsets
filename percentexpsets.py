@@ -131,14 +131,10 @@ def main():
     inv_map_rest = {}
     for k, v in groups.items():
         inv_map[v] = inv_map.get(v, []) + [k]
-        clist = inv_map.get(v, assay.columns)
+        clist = inv_map_rest.get(v, assay.columns)
         clist.remove(k)
         inv_map_rest[v] = clist
     # Inv map is {"cluster": ["cell"]}
-    for cluster, v in inv_map.items():
-        print("Cluster {} Result {}".format(cluster, v), flush=True)
-        if len(v)<2:
-            exit(1)
     print("Completed setup", flush=True)
     
     cols = list(inv_map.keys())
