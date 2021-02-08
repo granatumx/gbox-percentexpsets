@@ -156,10 +156,13 @@ def main():
     # { "gene_name" : { "cluster_name" : { statistics data } }}
     # Export would be percentage more/less expressed in "on" state
     # For example gene "XIST" expresses at least 20% more in cluster 1 vs cluster 4 with 95% certainty
+    gene_count = 0;
+    total_genes = len(assay.index)
     for gene, row in assay.iterrows():
+        print("{} / {}".format(gene_count, total_genes), flush=True)
+        gene_count = gene_count+1
         cluster_statistics = {}
         for cluster, v in inv_map.items():
-            print("Gene {} Cluster {} Result {}".format(gene, cluster, v), flush=True)
             cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
         cluster_rest_statistics = {}
         for cluster, v in inv_map_rest.items():
