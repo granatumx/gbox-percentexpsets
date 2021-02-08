@@ -1,0 +1,41 @@
+id: PercentExpSets-{VER}
+meta:
+  title: Percentage differential expression sets {VER}
+  subtitle: Reduce grouped data and transpose to determine genes of interest
+  description: >
+    If we have labeled or clustered the assay of cells, we can create statistics of each
+    group of cells for each gene such as examining if a gene is expressed in an ON state
+    x% more in one group than another group. We can then create a feature vector for each gene. 
+    Genes with similar expression behavior will be grouped together on a downstream analysis such as UMAP plotting. 
+    It will create an array with columns for the cluster comparisons and rows for each gene.
+    Each element will represent the increased or decreased percentage of cells turned on 
+    for that gene in the first group compared to the second group. It is expected that the
+    cells would follow a bimodal distribution if they do not have 100% or 0% expressed.
+    If both sets are found to have a unimodal distribution (within our certainty), then
+    we need to check if one set is fully ON and the other set is fully OFF within our certainty.
+    If it is so, then the comparison will return either -100% or 100% depending on the result.
+    If one set is found to have a unimodal distribution (within our certainty)
+endpoints:
+  backend:
+    cmd: python ./percentexpsets.py
+    type: docker
+    image: {GBOX}
+frontend:
+  args:
+    - min: 0.0
+      max: 100.0
+      step: 0.01
+      type: number
+      label: Certainty (I am x% certain that at least 30% are differentially expressing gene y in group 1 vs group 2)
+      default: 95.0
+      injectInto: certainty
+  imports:
+    - kind: assay
+      label: Assay including matrix and geneIds
+      injectInto: assay
+    - kind: sampleMeta
+      label: Cluster or labels
+      injectInto: groups
+  exports:
+    - kind: assay
+      extractFrom: Differential expression sets
