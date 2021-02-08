@@ -132,9 +132,10 @@ def main():
     for k, v in groups.items():
         inv_map[v] = inv_map.get(v, []) + [k]
         clist = inv_map.get(v, assay.columns)
-        clist.remove(clist)
+        clist.remove(k)
         inv_map_rest[v] = clist
     # Inv map is {"cluster": ["cell"]}
+    print("Completed setup", flush=True)
     
     cols = list(inv_map.keys())
     genes = assay.index.tolist()
