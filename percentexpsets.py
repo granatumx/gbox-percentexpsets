@@ -113,7 +113,7 @@ def compute_percent_diff(X1, X2, min_zscore=min_zscore):
     percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
     return percent_diff
 
-def comp(gene, assay, result, inv_map, inv_map_rest):
+def comp(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
     row = assay.loc[gene, :]
     cluster_statistics = {}
     for cluster, v in inv_map.items():
@@ -181,7 +181,7 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    Parallel(n_jobs=10, require='sharedmem')(delayed(comp)(gene, assay, result, inv_map, inv_map_rest) for gene in list(assay.index))
+    Parallel(n_jobs=10, require='sharedmem')(delayed(comp)(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in list(assay.index))
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
     gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
