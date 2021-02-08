@@ -115,8 +115,7 @@ def compute_percent_diff(X1, X2, min_zscore=min_zscore):
     percent_diff = (result_percent_expressed - source_percent_expressed)*100.0
     return percent_diff
 
-def comp(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
-    row = assay.loc[gene, :]
+def comp(gene, row, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
     cluster_statistics = {}
     for cluster, v in inv_map.items():
         cluster_statistics[cluster] = one_or_two_mixtures(row[v].tolist(), alpha=alpha, min_dist=min_dist)
@@ -171,8 +170,8 @@ def main():
     for coli in cols:
         colnames.append("{} vs rest".format(coli))
 
-    result = pd.DataFrame(index=genes, columns=colnames)
-    result.fillna(0)
+    # result = pd.DataFrame(index=genes, columns=colnames)
+    # result.fillna(0)
 
     # Instead of scoring into a dataframe, let's analyze each statistically
     # Dict (gene) of dict (cluster) of dict (statistics)
@@ -183,7 +182,8 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6), require='sharedmem')(delayed(comp)(gene, assay, result, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*5/6))(delayed(comp)(gene, assay.loc[gene, :], inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    result = pd.concat(result, axis=0)
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
     gn.export(result.to_csv(), 'differential_gene_sets.csv', kind='raw', meta=None, raw=True)
