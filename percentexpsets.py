@@ -12,7 +12,7 @@ from sklearn.mixture import GaussianMixture as GM
 import statistics as s
 from joblib import Parallel, delayed
 import multiprocessing
-import tqdm
+from tqdm import tqdm
 
 min_dist = 2.0
 min_zscore = 2.0
