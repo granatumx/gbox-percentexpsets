@@ -45,7 +45,7 @@ def trygmonvector(gm, X):
 
 # First try two mixtures
 # Return: {"data": X, "gm": GM, low_means: [], high_means: [], n: []}
-def one_or_two_mixtures(X, alpha=0.05, min_dist=min_dist):
+def one_or_two_mixtures(X, alpha=0.05, min_dist=min_dist, min_zscore=min_zscore):
     column = np.array(X).reshape(-1, 1)
     gm = GM(n_components=2).fit(column)
     inv_map = trygmonvector(gm, X)
@@ -61,7 +61,7 @@ def one_or_two_mixtures(X, alpha=0.05, min_dist=min_dist):
     mi2 = confint(inv_map[1], alpha=alpha)
     # zscore1 = abs(s.mean(inv_map[0])-s.mean(inv_map[1]))/(s.stdev(inv_map[1])+1e-16)
     # zscore2 = abs(s.mean(inv_map[1])-s.mean(inv_map[0]))/(s.stdev(inv_map[0])+1e-16)
-    if dist(mi1, mi2) <= min_dist:
+    if dist(mi1, mi2) <= min_dist or abs(gm.means_[1][0]-gm.means_[0][0])/(max(gm.covariances_)[0][0]) < min_zscore:
         gm = GM(n_components=1).fit(column)
         mi = confint(X)
         result = {"data": X, "mean": mean, "std": std, "gm": gm, "low_means": [mi["low"]], "high_means": [mi["high"]], "n": [len(X)]}
@@ -160,9 +160,10 @@ def compref(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zsc
         for cnamej, stj in cluster_statistics.items():
             if cnamei != cnamej:
                 result["{} vs {}".format(cnamei, cnamej)][gene] = sti-stj
-    for cnamei, sti in cluster_rest_statistics.items():
-        stself = cluster_statistics[cnamei]
-        result["{} vs rest".format(cnamei)][gene] = stself - sti
+    if len(colnames) > 2:
+        for cnamei, sti in cluster_rest_statistics.items():
+            stself = cluster_statistics[cnamei]
+            result["{} vs rest".format(cnamei)][gene] = stself - sti
     return result
 
 
@@ -178,9 +179,10 @@ def comp(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore
         for cnamej, stj in cluster_statistics.items():
             if cnamei != cnamej:
                 result["{} vs {}".format(cnamei, cnamej)][gene] = compute_percent_diff(sti, stj, min_zscore=min_zscore)
-    for cnamei, sti in cluster_rest_statistics.items():
-        stself = cluster_statistics[cnamei]
-        result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
+    if len(colnames) > 2:
+        for cnamei, sti in cluster_rest_statistics.items():
+            stself = cluster_statistics[cnamei]
+            result["{} vs rest".format(cnamei)][gene] = compute_percent_diff(stself, sti, min_zscore=min_zscore)
     return result
 
 
@@ -195,7 +197,7 @@ def main():
 
     certainty = gn.get_arg('certainty')
     alpha = 1 - certainty/100.0
-    
+
     min_zscore = gn.get_arg('min_zscore')
     min_dist = gn.get_arg('min_dist')
 
@@ -212,10 +214,10 @@ def main():
         inv_map_rest[v] = clist
     # Inv map is {"cluster": ["cell"]}
     print("Completed setup", flush=True)
-    
+
     cols = list(inv_map.keys())
     genes = assay.index.tolist()
-    
+
     colnames = []
     for coli in cols:
         for colj in cols:
