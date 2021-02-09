@@ -90,15 +90,16 @@ def compute_percent_expression(X1, X2, min_zscore=min_zscore):
         else:
             unexpressed_num = 0
         result_percent_expressed = expressed_num/(expressed_num+unexpressed_num)
-    elif len(X1["low_means"]) > 1:
-        result_percent_expressed = X1["n"][1]/(X1["n"][0]+X1["n"][1])
+#    elif len(X1["low_means"]) > 1:
+#        result_percent_expressed = X1["n"][1]/(X1["n"][0]+X1["n"][1])
     else:
-        if X1["low_means"][0] > X2["high_means"][0]:
-            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
-        elif X1["high_means"][0] < X2["low_means"][0]:
-            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
-        else:
-            result_percent_expressed = 0.0
+        result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+#        if X1["low_means"][0] > X2["high_means"][0]:
+#            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+#        elif X1["high_means"][0] < X2["low_means"][0]:
+#            result_percent_expressed = gen_expression_count(X1, X2, min_zscore=min_zscore)
+#        else:
+#            result_percent_expressed = 0.0
     return result_percent_expressed*100.0
 
 
