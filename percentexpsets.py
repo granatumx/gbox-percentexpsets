@@ -236,7 +236,7 @@ def main():
     total_genes = len(assay.index)
     print("Executing parallel for {} genes".format(total_genes), flush=True)
 
-    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*9/10))(delayed(compref)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
+    results = Parallel(n_jobs=math.floor(multiprocessing.cpu_count()*2*9/10))(delayed(compref)(gene, assay.loc[gene, :], colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore) for gene in tqdm(list(assay.index)))
     result = pd.concat(results, axis=0)
 
     gn.export_statically(gn.assay_from_pandas(result.T), 'Differential expression sets')
