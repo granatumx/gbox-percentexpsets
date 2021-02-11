@@ -185,7 +185,7 @@ def percent_upregulation(a):
     return 100.0*(1.0/(a+1.0))
 
 
-def upregulation_from_gaussian(X, mean, std, min_zscore=2):
+def upregulation_from_gaussian(X, mean):
     X = np.array(X)
     return 100.0*np.size(X[X-mean > 0]) / np.size(X)
 
@@ -198,7 +198,7 @@ def get_poisson_weight_with_statistic(row, params):   # Returns a
 
 def predict_row(row, params, min_zscore = 2):
     if params["n"] == 1:
-        return upregulation_from_gaussian(row, params["coeffs"][0], params["coeffs"][1], min_zscore=min_zscore)
+        return upregulation_from_gaussian(row, params["coeffs"][0])
 
     a = get_poisson_weight_with_statistic(row, params)
     params["coeffs"].x[0] = a                   # Update params with fitted a, this may side-effect
