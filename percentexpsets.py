@@ -209,6 +209,8 @@ def fit_row(row, alpha=0.05, min_dist=0.2, min_zscore = 2):  # Return the fitted
 
 # Main computation point
 def compref(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zscore):
+    row = np.array(row)
+    row = row[~(np.isnan(row))].tolist()
     base_statistic = fit_row(row, alpha=alpha, min_dist=min_dist, min_zscore=min_zscore)
     cluster_statistics = {}
     for cluster, v in inv_map.items():
