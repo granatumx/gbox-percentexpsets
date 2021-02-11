@@ -109,8 +109,8 @@ def one_or_two_mixtures(X, alpha=0.05, min_dist=0.2, min_zscore=2):
     column = np.array(X).reshape(-1, 1)
     gm = GM(n_components=2).fit(column)
     inv_map = trygmonvector(gm, X)
-    mean = s.mean(X)
-    std = s.stdev(X)
+    mean = np.mean(X)
+    std = np.std(X)
 
     if len(inv_map) <= 1 or len(inv_map[0]) < 3 or len(inv_map[1]) < 3:
         gm = GM(n_components=1).fit(column)
