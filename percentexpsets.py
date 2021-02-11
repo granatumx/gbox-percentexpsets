@@ -223,11 +223,11 @@ def compref(gene, row, colnames, inv_map, inv_map_rest, alpha, min_dist, min_zsc
     for cnamei, sti in cluster_statistics.items():
         for cnamej, stj in cluster_statistics.items():
             if cnamei != cnamej:
-                result["{} vs {}".format(cnamei, cnamej)][gene] = sti-stj
+                result["{} vs {}".format(cnamei, cnamej)][gene] = sti/(stj+1.0)
     if len(colnames) > 2:
         for cnamei, sti in cluster_rest_statistics.items():
             stself = cluster_statistics[cnamei]
-            result["{} vs rest".format(cnamei)][gene] = stself - sti
+            result["{} vs rest".format(cnamei)][gene] = stself / (sti+1.0)
     return result
 
 
