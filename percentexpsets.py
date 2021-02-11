@@ -137,9 +137,10 @@ def one_or_two_mixtures(X, alpha=0.05, min_dist=0.2, min_zscore=2):
     return result
 
 # First transform X into log(X)+c such that it does not go below 0, X is a list
-def fit_poissons(X, alpha=0.05, min_dist=0.2, min_zscore=2):
+def fit_poissons(X, alpha=0.05, min_dist=0.2, min_zscore=1):
     if np.mean(X) < 5:  # Can't really form a good statistic
-        return {"n": 1, "coeffs": [np.mean(X), np.std(X)]}
+        meanbounds = sms.DescrStatsW(X).tconfint_mean(alpha=alpha)
+        return {"n": 1, "coeffs": [meanbounds[1]]}
     shift = np.min(X) - 1  # Needed later to shift back
     Xarr = np.log(X - shift)
     res = one_or_two_mixtures(Xarr.tolist(), alpha=0.05, min_dist=min_dist, min_zscore=min_zscore)
@@ -241,8 +242,9 @@ def main():
     certainty = gn.get_arg('certainty')
     alpha = 1 - certainty/100.0
 
-    min_zscore = gn.get_arg('min_zscore')
-    min_dist = gn.get_arg('min_dist')
+    min_zscore = st.norm.ppf(gn.get_arg("certainty")/100.0)
+
+    min_dist = 0.1
 
     # Likely we want to filter genes before we get started, namely if we cannot create a good statistic
     norms_df = assay.apply(np.linalg.norm, axis=1)
