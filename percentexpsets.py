@@ -8,6 +8,7 @@ import math
 import statsmodels.stats.api as sms
 from granatum_sdk import Granatum
 from scipy.stats import poisson
+import scipy.stats as st
 from scipy.optimize import least_squares
 from sklearn.mixture import GaussianMixture as GM
 import statistics as s
